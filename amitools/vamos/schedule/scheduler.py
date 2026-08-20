@@ -108,6 +108,11 @@ class Scheduler(object):
                 self.waiting_tasks,
             )
 
+            # nothing to do anymore? (with a message pump, keep pumping
+            # below even when no task is left)
+            if self.message_pump is None and self.get_num_tasks() == 0:
+                break
+
             # has the current task forbid state?
             if self.cur_task and self.cur_task.is_forbidden():
                 log_schedule.debug("run: keep current (forbid state)")
@@ -181,6 +186,8 @@ class Scheduler(object):
 
         # keep current task
         task = self.cur_task
+        if task is None:
+            return None
         log_schedule.debug("take: current task %s", task.name)
         if task.get_state() in (TaskState.TS_READY, TaskState.TS_RUN):
             return task
