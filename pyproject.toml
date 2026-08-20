@@ -20,7 +20,7 @@ classifiers = [
 dynamic = ["version", "readme"]
 
 [project.optional-dependencies]
-vamos = ["machine68k >= 0.4.0", "greenlet"]
+vamos = ["machine68k >= 0.4.0", "greenlet", "pysdl2"]
 
 [tool.setuptools]
 zip-safe = false
