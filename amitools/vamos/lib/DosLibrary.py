@@ -855,12 +855,21 @@ class DosLibrary(LibImpl):
         log_dos.info("PutStr: %s", show_data)
         return 0  # ok
 
+    @staticmethod
+    def _is_host_stdin(obj):
+        # sys.stdin may be a capture object without a real fd (e.g. under
+        # pytest), where fileno() raises
+        try:
+            return obj.fileno() == sys.stdin.fileno()
+        except (OSError, ValueError, AttributeError):
+            return False
+
     def Flush(self, ctx):
         fh_b_addr = ctx.cpu.r_reg(REG_D1)
         fh = self.file_mgr.get_by_b_addr(fh_b_addr, True)
         fh.flush()
         # remove command line from stdin
-        if fh.obj.fileno() == sys.stdin.fileno():
+        if self._is_host_stdin(fh.obj):
             fh.setbuf(bytearray())
             
         return -1
@@ -986,7 +995,7 @@ class DosLibrary(LibImpl):
         fh = self.file_mgr.get_by_b_addr(fh_b_addr, False)
         
         # Block until input is available
-        if fh.obj.fileno() == sys.stdin.fileno():
+        if self._is_host_stdin(fh.obj):
             while True:
                 ready, _, _ = select.select([fh.obj], [], [], None)
                 if ready:
