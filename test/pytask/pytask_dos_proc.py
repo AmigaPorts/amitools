@@ -6,6 +6,7 @@ from amitools.vamos.libstructs import (
     ProcessStruct,
     TaskState,
 )
+from amitools.vamos import libtypes
 from amitools.vamos.libtypes import DosTag, TagList
 
 
@@ -51,6 +52,51 @@ def pytask_dos_create_new_proc_entry_test(vamos_task):
         DosLibrary._child_processes.pop(proc_addr, None)
         tags.free()
         ctx.alloc.free_cstr(name_mem)
+        return 0
+
+    exit_codes = vamos_task.run([proc], process=True)
+    assert exit_codes == [0]
+
+
+def pytask_dos_create_new_proc_local_vars_test(vamos_task):
+    """a child gets its own copy of the parent's local variables, or none
+    with NP_CopyVars FALSE; the list stays sorted by name"""
+
+    def proc(ctx, task):
+        dos_proxy = ctx.proxies.get_dos_lib_proxy()
+        parent = ctx.process.proc
+        LV_VAR = 0
+
+        var = parent.create_var("zeta", LV_VAR)
+        parent.set_var_value(var, 7, value="parent")
+        var = parent.create_var("Alpha", LV_VAR, flags=0x400)
+        parent.set_var_value(var, 3, src_addr=var.addr)
+        assert [v.name for v in parent.iter_local_vars()] == ["Alpha", "zeta"]
+
+        tags = TagList.alloc(ctx.alloc, (DosTag.NP_Entry, 0x123456))
+        proc_addr = dos_proxy.CreateNewProc(tags)
+        assert proc_addr != 0
+        child = libtypes.Process._bind(ctx.mem, proc_addr)
+        assert [v.name for v in child.iter_local_vars()] == ["Alpha", "zeta"]
+        cvar = child.find_var("zeta", LV_VAR)
+        assert ctx.mem.r_cstr(cvar.value.aptr) == "parent"
+        assert cvar.value.aptr != parent.find_var("zeta", LV_VAR).value.aptr
+        assert child.find_var("alpha", LV_VAR).flags.val == 0x400
+        # the child's own change stays with the child
+        ctx.mem.w_cstr(cvar.value.aptr, "child")
+        assert ctx.mem.r_cstr(parent.find_var("zeta", LV_VAR).value.aptr) == "parent"
+        DosLibrary._child_processes.pop(proc_addr, None)
+        tags.free()
+
+        tags = TagList.alloc(
+            ctx.alloc, (DosTag.NP_Entry, 0x123456), (DosTag.NP_CopyVars, 0)
+        )
+        proc_addr = dos_proxy.CreateNewProc(tags)
+        assert proc_addr != 0
+        child = libtypes.Process._bind(ctx.mem, proc_addr)
+        assert list(child.iter_local_vars()) == []
+        DosLibrary._child_processes.pop(proc_addr, None)
+        tags.free()
         return 0
 
     exit_codes = vamos_task.run([proc], process=True)

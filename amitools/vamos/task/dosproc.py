@@ -17,7 +17,9 @@ class DosProcess(ExecTask):
         super().__init__(
             machine, alloc, name, ami_task=self.proc.task, ami_proc=self.proc, **kw_args
         )
+        self.proc.stack_size.val = self.stack.get_size()
 
     def free(self):
+        self.proc.free_local_vars()
         self.proc.free()
         super().free()

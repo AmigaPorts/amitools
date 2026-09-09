@@ -33,6 +33,8 @@ class ExecTask(MappedTask):
         else:
             self.task = ami_task
             self.own_task = False
+        self.task.sp_lower.aptr = self.stack.get_lower()
+        self.task.sp_upper.aptr = self.stack.get_upper()
 
         sp = self.stack.get_initial_sp()
         # python task?
