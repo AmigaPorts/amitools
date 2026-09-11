@@ -1,8 +1,12 @@
 name: amitools GH Test
 
+# Branches are tested through their pull request (merged with main), so
+# a push only runs the matrix on main itself and on release tags.
 on:
-  - push
-  - pull_request
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
 
 jobs:
   build:
