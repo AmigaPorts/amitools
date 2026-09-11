@@ -1,8 +1,12 @@
 name: amitools GH Test
 
+# Branches are tested through their pull request (merged with main), so
+# a push only runs the matrix on main itself and on release tags.
 on:
-  - push
-  - pull_request
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
 
 jobs:
   build:
@@ -26,3 +30,31 @@ jobs:
       run: tox -vvv
       env:
         PLATFORM: ${{ matrix.platform }}
+
+  # sdist and wheel of this revision, so a pull request can be tried out
+  # with "pip install <wheel>" before it is merged
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        # setuptools_scm needs the tag history for the version
+        fetch-depth: 0
+    - uses: actions/setup-python@v6
+      with:
+        python-version: '3.13'
+    - name: Build sdist and wheel
+      run: |
+        python -m pip install --upgrade pip build twine
+        python -m build
+        python -m twine check dist/*
+    - name: Smoke test the wheel
+      run: |
+        python -m pip install dist/amitools-*.whl
+        xdftool --help >/dev/null
+        hunktool --help >/dev/null
+        romtool --help >/dev/null
+    - uses: actions/upload-artifact@v7
+      with:
+        name: amitools-dist
+        path: dist/*
